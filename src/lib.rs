@@ -1,0 +1,14 @@
+pub mod app;
+pub mod config;
+pub mod history;
+pub mod install;
+pub mod layout;
+pub mod library;
+pub mod metadata;
+pub mod opener;
+pub mod ports;
+pub mod presentation;
+pub mod search;
+pub mod theme;
+pub mod ui;
+pub mod watcher;
