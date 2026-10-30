@@ -260,3 +260,39 @@ fn installable_package_is_offered_only_for_zathura() {
     let other = ReaderCommand::parse("evince").unwrap();
     assert_eq!(installable_package(&other), None);
 }
+
+struct RecordingPrompt(std::cell::RefCell<Vec<String>>);
+
+impl Prompt for RecordingPrompt {
+    fn ask(&self, question: &str, _default: &str) -> anyhow::Result<String> {
+        self.0.borrow_mut().push(question.to_string());
+        Ok("n".to_string())
+    }
+}
+
+#[test]
+fn install_prompt_names_the_package() {
+    let readiness = FakeReadiness {
+        calls: Cell::new(0),
+        present_initially: false,
+        present_after_install: false,
+    };
+    let runner = FakeRunner {
+        calls: Cell::new(0),
+        succeed: true,
+    };
+    let prompt = RecordingPrompt(Default::default());
+    let reader = ReaderCommand::parse("zathura").unwrap();
+    ReaderInstaller {
+        readiness: &readiness,
+        prompt: &prompt,
+        runner: &runner,
+        available: &|binary| binary == "apt-get",
+        reader: &reader,
+        package: "zathura",
+        out: &mut Vec::new(),
+    }
+    .ensure()
+    .unwrap();
+    assert_eq!(*prompt.0.borrow(), vec!["Install zathura now?"]);
+}

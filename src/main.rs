@@ -1,6 +1,8 @@
 use anyhow::{bail, Context, Result};
 use books_tui::app::{update, AppState, Effect, Event, Status};
-use books_tui::config::{BooksDir, Config, FileConfigStore, FirstRun, ReaderCommand, StdinPrompt};
+use books_tui::config::{
+    resolve_config_path, BooksDir, Config, FileConfigStore, FirstRun, ReaderCommand, StdinPrompt,
+};
 use books_tui::history;
 use books_tui::install::{installable_package, PathReadiness, ReaderInstaller, SystemRunner};
 use books_tui::layout::rows_visible;
@@ -74,10 +76,11 @@ fn run() -> Result<()> {
 }
 
 fn default_config_path(home: &Path) -> PathBuf {
-    dirs::config_dir()
-        .unwrap_or_else(|| home.join(".config"))
-        .join("books-tui")
-        .join("config.toml")
+    resolve_config_path(
+        std::env::var_os("XDG_CONFIG_HOME").as_deref(),
+        dirs::config_dir(),
+        home,
+    )
 }
 
 fn resolve_config(

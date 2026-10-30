@@ -154,3 +154,50 @@ fn reader_command_splits_program_and_arguments_on_whitespace() {
     assert_eq!(bare.program(), "zathura");
     assert!(bare.args().is_empty());
 }
+
+#[test]
+fn config_path_prefers_absolute_xdg_config_home() {
+    use books_tui::config::resolve_config_path;
+    use std::ffi::OsStr;
+    use std::path::PathBuf;
+    let home = Path::new("/home/u");
+    let system = Some(PathBuf::from("/home/u/Library/Application Support"));
+    assert_eq!(
+        resolve_config_path(Some(OsStr::new("/xdg")), system.clone(), home),
+        PathBuf::from("/xdg/books-tui/config.toml")
+    );
+    for ignored in ["", "relative/dir"] {
+        assert_eq!(
+            resolve_config_path(Some(OsStr::new(ignored)), system.clone(), home),
+            PathBuf::from("/home/u/Library/Application Support/books-tui/config.toml")
+        );
+    }
+    assert_eq!(
+        resolve_config_path(None, None, home),
+        PathBuf::from("/home/u/.config/books-tui/config.toml")
+    );
+}
+
+#[test]
+fn confirm_questions_default_to_no_and_parse_yes() {
+    let prompt = FakePrompt::new(&["y", "", "no"]);
+    assert!(prompt.confirm("Go?").unwrap());
+    assert!(!prompt.confirm("Go?").unwrap());
+    assert!(!prompt.confirm("Go?").unwrap());
+}
+
+#[test]
+fn first_run_asks_the_spec_worded_create_question() {
+    let temp = tempdir().unwrap();
+    let store = FakeStore {
+        saved: RefCell::new(None),
+    };
+    let prompt = FakePrompt::new(&["~/new", "y"]);
+    FirstRun::new(&store, &prompt, temp.path(), "zathura")
+        .run()
+        .unwrap();
+    assert_eq!(
+        prompt.asked.borrow()[1],
+        "Directory does not exist. Create it?|n"
+    );
+}

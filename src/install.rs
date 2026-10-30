@@ -121,8 +121,10 @@ impl ReaderInstaller<'_> {
             "Detected: {} ({})",
             manager.name, manager.description
         )?;
-        let answer = self.prompt.ask("Install it now?", "n")?;
-        if !crate::config::is_yes(&answer) {
+        if !self
+            .prompt
+            .confirm(&format!("Install {} now?", self.package))?
+        {
             writeln!(
                 self.out,
                 "Install it with: {}",

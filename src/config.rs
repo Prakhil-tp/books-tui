@@ -141,19 +141,44 @@ impl Default for StdinPrompt {
     }
 }
 
-impl Prompt for StdinPrompt {
-    fn ask(&self, question: &str, default: &str) -> Result<String> {
-        print!("{question} [{default}]: ");
+impl StdinPrompt {
+    fn read(prompt: &str) -> Result<String> {
+        print!("{prompt}");
         io::stdout().flush()?;
         let mut answer = String::new();
         io::stdin().read_line(&mut answer)?;
-        let answer = answer.trim();
+        Ok(answer.trim().to_string())
+    }
+}
+
+impl Prompt for StdinPrompt {
+    fn ask(&self, question: &str, default: &str) -> Result<String> {
+        let answer = Self::read(&format!("{question} [{default}]: "))?;
         Ok(if answer.is_empty() {
             default.to_string()
         } else {
-            answer.to_string()
+            answer
         })
     }
+
+    fn confirm(&self, question: &str) -> Result<bool> {
+        Ok(is_yes(&Self::read(&format!("{question} [y/N] "))?))
+    }
+}
+
+/// Config file location: `$XDG_CONFIG_HOME` (if non-empty and absolute), then
+/// the platform config directory, then `~/.config`.
+pub fn resolve_config_path(
+    xdg_config_home: Option<&std::ffi::OsStr>,
+    system_config_dir: Option<PathBuf>,
+    home: &Path,
+) -> PathBuf {
+    let base = xdg_config_home
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
+        .or(system_config_dir)
+        .unwrap_or_else(|| home.join(".config"));
+    base.join("books-tui").join("config.toml")
 }
 
 pub struct FirstRun<'a> {
@@ -192,10 +217,10 @@ impl<'a> FirstRun<'a> {
             if books_dir.as_path().is_dir() {
                 return self.persist(books_dir);
             }
-            let create = self
+            if self
                 .prompt
-                .ask("Directory does not exist. Create it?", "n")?;
-            if is_yes(&create) {
+                .confirm("Directory does not exist. Create it?")?
+            {
                 std::fs::create_dir_all(books_dir.as_path())?;
                 return self.persist(books_dir);
             }
