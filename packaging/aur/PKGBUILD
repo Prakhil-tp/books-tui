@@ -8,6 +8,7 @@ url="https://github.com/Prakhil-tp/books-tui"
 license=('MIT')
 provides=('books-tui')
 conflicts=('books-tui')
+options=('!debug')
 optdepends=('zathura-pdf-mupdf: default PDF reader'
             'poppler: author, page, and year metadata')
 source=("LICENSE-$pkgver::https://raw.githubusercontent.com/Prakhil-tp/books-tui/v$pkgver/LICENSE")

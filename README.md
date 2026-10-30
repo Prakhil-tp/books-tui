@@ -26,6 +26,15 @@ curl -fsSLO "https://github.com/Prakhil-tp/books-tui/releases/download/v0.1.1/bo
 sudo apt install ./books-tui_0.1.1-1_${arch}.deb
 ```
 
+**Arch Linux**
+
+```sh
+curl -fsSLO https://github.com/Prakhil-tp/books-tui/releases/download/v0.1.1/books-tui-bin-0.1.1-1-x86_64.pkg.tar.zst
+sudo pacman -U ./books-tui-bin-0.1.1-1-x86_64.pkg.tar.zst
+```
+
+Or build it yourself: `git clone https://github.com/Prakhil-tp/books-tui && cd books-tui/packaging/aur && makepkg -si`
+
 **Prebuilt binary** from [Releases](https://github.com/Prakhil-tp/books-tui/releases/latest)
 
 ```sh

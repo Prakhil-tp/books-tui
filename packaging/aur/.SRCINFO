@@ -10,6 +10,7 @@ pkgbase = books-tui-bin
 	optdepends = poppler: author, page, and year metadata
 	provides = books-tui
 	conflicts = books-tui
+	options = !debug
 	source = LICENSE-0.1.1::https://raw.githubusercontent.com/Prakhil-tp/books-tui/v0.1.1/LICENSE
 	sha256sums = 460c3bf8fd078d7020678dd3e310a088a1d97f1e0936aa926b369f0655888982
 	source_x86_64 = books-tui-bin-0.1.1-x86_64.tar.gz::https://github.com/Prakhil-tp/books-tui/releases/download/v0.1.1/books-tui-x86_64-unknown-linux-musl.tar.gz

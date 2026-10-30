@@ -52,3 +52,22 @@ jobs:
           gh release upload "$GITHUB_REF_NAME" "$deb"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  arch-package:
+    needs: upload-assets
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - run: pacman -Syu --noconfirm --needed base-devel pacman-contrib github-cli git
+      - uses: actions/checkout@v4
+      - run: |
+          useradd -m builder
+          cp -r packaging/aur /home/builder/pkg
+          cd /home/builder/pkg
+          sed -i "s/^pkgver=.*/pkgver=${GITHUB_REF_NAME#v}/; s/^pkgrel=.*/pkgrel=1/" PKGBUILD
+          chown -R builder .
+          su builder -c "updpkgsums && makepkg --noconfirm"
+          gh release upload "$GITHUB_REF_NAME" ./*.pkg.tar.zst
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
