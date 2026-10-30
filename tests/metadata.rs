@@ -46,11 +46,11 @@ fn reads_author_pages_and_year() {
     let metadata = reader.read(&book_path(Path::new("/tmp/book.pdf")));
     assert_eq!(
         metadata,
-        BookMetadata {
+        Some(BookMetadata {
             author: "Alex Xu".to_string(),
             pages: 269,
             year: 2020,
-        }
+        })
     );
 }
 
@@ -60,17 +60,14 @@ fn failed_or_broken_output_yields_defaults() {
         output: PDFINFO.to_string(),
         success: false,
     });
-    assert_eq!(
-        failed.read(&book_path(Path::new("/tmp/book.pdf"))),
-        BookMetadata::default()
-    );
+    assert_eq!(failed.read(&book_path(Path::new("/tmp/book.pdf"))), None);
     let broken = PdfInfoReader::new(FakeRunner {
         output: "Pages: many\n".to_string(),
         success: true,
     });
     assert_eq!(
         broken.read(&book_path(Path::new("/tmp/book.pdf"))),
-        BookMetadata::default()
+        Some(BookMetadata::default())
     );
 }
 
@@ -80,9 +77,9 @@ struct CountingReader {
 }
 
 impl MetadataReader for CountingReader {
-    fn read(&self, _path: &BookPath) -> BookMetadata {
+    fn read(&self, _path: &BookPath) -> Option<BookMetadata> {
         self.calls.fetch_add(1, Ordering::SeqCst);
-        self.metadata.clone()
+        Some(self.metadata.clone())
     }
 }
 
@@ -167,4 +164,44 @@ fn reuses_the_on_disk_cache_on_a_new_instance() {
     );
     assert_eq!(cache.metadata_for(&book_path(&book)), metadata);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
+}
+
+struct FlakyReader {
+    calls: Arc<AtomicUsize>,
+    succeed_after: usize,
+}
+
+impl MetadataReader for FlakyReader {
+    fn read(&self, _path: &BookPath) -> Option<BookMetadata> {
+        let call = self.calls.fetch_add(1, Ordering::SeqCst) + 1;
+        (call > self.succeed_after).then(|| BookMetadata {
+            author: "Alex Xu".to_string(),
+            pages: 269,
+            year: 2020,
+        })
+    }
+}
+
+#[test]
+fn a_failed_read_is_not_cached_and_is_retried() {
+    let temp = tempdir().unwrap();
+    let book = temp.path().join("book.pdf");
+    std::fs::write(&book, b"pdf").unwrap();
+    let cache_path = temp.path().join("cache.json");
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut cache = MetadataCache::new(
+        FlakyReader {
+            calls: calls.clone(),
+            succeed_after: 1,
+        },
+        JsonStore::new(cache_path.clone()),
+    );
+
+    let first = cache.metadata_for(&book_path(&book));
+    assert_eq!(first, BookMetadata::default());
+    assert!(!cache_path.exists());
+
+    let second = cache.metadata_for(&book_path(&book));
+    assert_eq!(second.pages, 269);
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
 }

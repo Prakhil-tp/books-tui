@@ -16,7 +16,8 @@ pub struct BookMetadata {
 }
 
 pub trait MetadataReader: Send {
-    fn read(&self, path: &BookPath) -> BookMetadata;
+    /// `None` when the metadata could not be read (nothing should be cached).
+    fn read(&self, path: &BookPath) -> Option<BookMetadata>;
 }
 
 pub struct PdfInfoReader<R: CommandRunner> {
@@ -30,15 +31,13 @@ impl<R: CommandRunner> PdfInfoReader<R> {
 }
 
 impl<R: CommandRunner + Send> MetadataReader for PdfInfoReader<R> {
-    fn read(&self, path: &BookPath) -> BookMetadata {
+    fn read(&self, path: &BookPath) -> Option<BookMetadata> {
         let path_text = path.as_path().to_string_lossy().into_owned();
-        let Ok(output) = self.runner.run(&["pdfinfo", &path_text]) else {
-            return BookMetadata::default();
-        };
+        let output = self.runner.run(&["pdfinfo", &path_text]).ok()?;
         if !output.status.success() {
-            return BookMetadata::default();
+            return None;
         }
-        parse_pdfinfo(&String::from_utf8_lossy(&output.stdout))
+        Some(parse_pdfinfo(&String::from_utf8_lossy(&output.stdout)))
     }
 }
 
@@ -138,7 +137,7 @@ impl<R: MetadataReader> MetadataCache<R> {
 
     pub fn metadata_for(&mut self, path: &BookPath) -> BookMetadata {
         let Some(stamp) = stamp(path.as_path()) else {
-            return self.reader.read(path);
+            return self.reader.read(path).unwrap_or_default();
         };
         let key = path.as_path().to_string_lossy().into_owned();
         if let Some(entry) = self.entries.get(&key) {
@@ -146,7 +145,9 @@ impl<R: MetadataReader> MetadataCache<R> {
                 return entry.metadata();
             }
         }
-        let metadata = self.reader.read(path);
+        let Some(metadata) = self.reader.read(path) else {
+            return BookMetadata::default();
+        };
         self.entries.insert(
             key,
             CacheEntry {
