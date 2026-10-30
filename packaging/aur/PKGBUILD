@@ -1,0 +1,23 @@
+# Maintainer: Prakhil TP <20636485+Prakhil-tp@users.noreply.github.com>
+pkgname=books-tui-bin
+pkgver=0.1.1
+pkgrel=1
+pkgdesc="Browse, fuzzy-search, and open your PDF library from the terminal"
+arch=('x86_64' 'aarch64')
+url="https://github.com/Prakhil-tp/books-tui"
+license=('MIT')
+provides=('books-tui')
+conflicts=('books-tui')
+optdepends=('zathura-pdf-mupdf: default PDF reader'
+            'poppler: author, page, and year metadata')
+source=("LICENSE-$pkgver::https://raw.githubusercontent.com/Prakhil-tp/books-tui/v$pkgver/LICENSE")
+source_x86_64=("$pkgname-$pkgver-x86_64.tar.gz::$url/releases/download/v$pkgver/books-tui-x86_64-unknown-linux-musl.tar.gz")
+source_aarch64=("$pkgname-$pkgver-aarch64.tar.gz::$url/releases/download/v$pkgver/books-tui-aarch64-unknown-linux-musl.tar.gz")
+sha256sums=('460c3bf8fd078d7020678dd3e310a088a1d97f1e0936aa926b369f0655888982')
+sha256sums_x86_64=('9220e90be5459d566c2fb9837374fc7fd420fc28efcaa9814849e4493ce06ae9')
+sha256sums_aarch64=('9c3557281efe20810d2576d34dd3aed6c8683b577d822b978cf7f57cca119b20')
+
+package() {
+  install -Dm755 books-tui "$pkgdir/usr/bin/books-tui"
+  install -Dm644 "LICENSE-$pkgver" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

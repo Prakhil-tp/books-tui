@@ -12,19 +12,32 @@ Browse and open your PDF library from the terminal.
 
 ## Install
 
-Download a prebuilt binary from
-[Releases](https://github.com/Prakhil-tp/books-tui/releases/latest):
+**Homebrew** (macOS, Linux)
 
 ```sh
-# pick one: x86_64-unknown-linux-musl, aarch64-unknown-linux-musl,
-#           x86_64-apple-darwin, aarch64-apple-darwin
+brew install prakhil-tp/tap/books-tui
+```
+
+**Debian / Ubuntu**
+
+```sh
+arch=$(dpkg --print-architecture)   # amd64 or arm64
+curl -fsSLO "https://github.com/Prakhil-tp/books-tui/releases/download/v0.1.1/books-tui_0.1.1-1_${arch}.deb"
+sudo apt install ./books-tui_0.1.1-1_${arch}.deb
+```
+
+**Prebuilt binary** from [Releases](https://github.com/Prakhil-tp/books-tui/releases/latest)
+
+```sh
+# x86_64-unknown-linux-musl, aarch64-unknown-linux-musl,
+# x86_64-apple-darwin, or aarch64-apple-darwin
 target=x86_64-unknown-linux-musl
 mkdir -p ~/.local/bin
 curl -fsSL "https://github.com/Prakhil-tp/books-tui/releases/latest/download/books-tui-$target.tar.gz" \
   | tar -xz -C ~/.local/bin books-tui
 ```
 
-Or build from source (Rust 1.88+):
+**From source** (Rust 1.88+)
 
 ```sh
 cargo install --git https://github.com/Prakhil-tp/books-tui.git
