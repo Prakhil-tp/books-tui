@@ -1,0 +1,142 @@
+use books_tui::app::{AppState, FilterState};
+use books_tui::config::{BooksDir, Config, ReaderCommand};
+use books_tui::history::ReadingRecord;
+use books_tui::library::{Book, BookPath};
+use books_tui::metadata::BookMetadata;
+use books_tui::ui;
+use ratatui::backend::TestBackend;
+use ratatui::Terminal;
+use std::path::{Path, PathBuf};
+
+fn state(titles: &[&str]) -> AppState {
+    let books_dir = BooksDir::parse("/books", Path::new("/")).unwrap();
+    let reader = ReaderCommand::parse("zathura").unwrap();
+    let mut state = AppState::new(Config::new(books_dir, reader));
+    let books = titles
+        .iter()
+        .map(|title| Book {
+            path: BookPath::new(PathBuf::from(format!("/books/{title}.pdf"))),
+            size: 1024,
+        })
+        .collect();
+    state.replace_books(books);
+    state
+}
+
+fn render(state: &AppState, width: u16, height: u16) -> String {
+    let backend = TestBackend::new(width, height);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|frame| ui::draw(frame, state)).unwrap();
+    let buffer = terminal.backend().buffer();
+    (0..buffer.area.height)
+        .map(|y| {
+            (0..buffer.area.width)
+                .map(|x| buffer[(x, y)].symbol())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn draws_wordmark_summary_and_footer() {
+    let state = state(&["a", "b", "c"]);
+    let text = render(&state, 90, 26);
+    assert!(text.contains("██▄"));
+    assert!(text.contains("3 volumes"));
+    assert!(text.contains("3.0K"));
+    assert!(text.contains("j/k"));
+}
+
+#[test]
+fn marks_the_selected_row() {
+    let state = state(&["a", "b", "c"]);
+    assert!(render(&state, 90, 26).contains("▌"));
+}
+
+#[test]
+fn shows_metadata_progress_and_history() {
+    let mut state = state(&["book"]);
+    let path = state.books[0].path.clone();
+    state.metadata.insert(
+        path.clone(),
+        BookMetadata {
+            author: "Martin Kleppmann".to_string(),
+            pages: 613,
+            year: 2017,
+        },
+    );
+    state.records.insert(
+        path,
+        ReadingRecord {
+            page: 19,
+            read_at: 0,
+        },
+    );
+    let text = render(&state, 90, 26);
+    assert!(text.contains("Martin Kleppmann"));
+    assert!(text.contains("613 pages"));
+    assert!(text.contains("2017"));
+    assert!(text.contains("page 19"));
+    assert!(text.contains("3%"));
+}
+
+#[test]
+fn shows_unread_for_books_without_progress() {
+    let state = state(&["book"]);
+    let text = render(&state, 90, 26);
+    assert!(text.contains("unread"));
+    assert!(text.contains("unknown author"));
+}
+
+#[test]
+fn renders_the_empty_library_message() {
+    let state = state(&[]);
+    assert!(render(&state, 90, 20).contains("no PDFs found"));
+}
+
+#[test]
+fn renders_the_too_small_message() {
+    let state = state(&["a"]);
+    assert!(render(&state, 20, 5).contains("terminal too small"));
+}
+
+#[test]
+fn renders_a_scrollbar_for_long_lists() {
+    let titles: Vec<String> = (0..40).map(|index| format!("book{index}")).collect();
+    let refs: Vec<&str> = titles.iter().map(String::as_str).collect();
+    let mut state = state(&refs);
+    state.cursor = 39;
+    state.offset = 35;
+    assert!(render(&state, 90, 20).contains("█"));
+}
+
+#[test]
+fn status_replaces_the_footer_hints() {
+    let mut state = state(&["a"]);
+    state.set_status("zathura not found in PATH");
+    let text = render(&state, 90, 26);
+    assert!(text.contains("zathura not found in PATH"));
+    assert!(!text.contains("j/k"));
+}
+
+#[test]
+fn filter_mode_renders_a_search_bar() {
+    let mut state = state(&["rust", "clean"]);
+    state.filter = FilterState::Editing {
+        query: "ru".to_string(),
+    };
+    state.rebuild_visible();
+    let text = render(&state, 90, 26);
+    assert!(text.contains("/ru"));
+    assert!(text.contains("1 match"));
+}
+
+#[test]
+fn normal_screen_snapshot() {
+    let state = state(&[
+        "designing-data-intensive-applications-by-martin-kleppmann",
+        "clean-code",
+    ]);
+    insta::assert_snapshot!(render(&state, 90, 26));
+}
