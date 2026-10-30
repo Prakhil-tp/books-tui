@@ -198,3 +198,33 @@ fn normal_screen_snapshot() {
     ]);
     insta::assert_snapshot!(render(&state, 90, 26));
 }
+
+fn numbered(count: usize) -> Vec<Book> {
+    (0..count)
+        .map(|n| Book {
+            path: BookPath::new(PathBuf::from(format!("/books/book{n:02}.pdf"))),
+            size: 10,
+        })
+        .collect()
+}
+
+#[test]
+fn shrinking_the_library_while_scrolled_does_not_panic() {
+    let mut state = state(&[]);
+    state.replace_books(numbered(30));
+    state.cursor = 29;
+    state.offset = 24;
+    state.replace_books(numbered(27));
+    let text = render(&state, 80, 24);
+    assert!(text.contains("Book 26") || text.contains("book26") || text.contains("Book26"));
+}
+
+#[test]
+fn drawing_larger_than_the_last_update_does_not_panic() {
+    let mut state = state(&[]);
+    state.replace_books(numbered(30));
+    state.cursor = 29;
+    state.offset = 24;
+    let text = render(&state, 80, 40);
+    assert!(text.to_lowercase().contains("book29"));
+}

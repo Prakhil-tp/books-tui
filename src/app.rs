@@ -107,6 +107,13 @@ impl AppState {
             }
         }
         self.clamp_cursor();
+        self.offset = self.offset.min(self.visible.len().saturating_sub(1));
+    }
+
+    /// Replaces the library and re-clamps the scroll offset for `rows` rows.
+    pub fn refresh_books(&mut self, books: Vec<Book>, rows: usize) {
+        self.replace_books(books);
+        self.scroll_to_cursor(rows);
     }
 
     pub fn rebuild_visible(&mut self) {

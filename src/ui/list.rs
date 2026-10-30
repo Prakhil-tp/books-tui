@@ -12,7 +12,7 @@ use ratatui::Frame;
 const BAR_WIDTH: u32 = 6;
 const PROGRESS_BLOCK: u16 = BAR_WIDTH as u16 + 5;
 
-pub fn draw(frame: &mut Frame, state: &AppState, geo: &Geometry, palette: &Palette) {
+pub fn draw(frame: &mut Frame, state: &AppState, geo: &Geometry, palette: &Palette, offset: usize) {
     if state.visible.is_empty() {
         let message = if state.books.is_empty() {
             format!(
@@ -35,7 +35,7 @@ pub fn draw(frame: &mut Frame, state: &AppState, geo: &Geometry, palette: &Palet
         return;
     }
     for row in 0..geo.visible {
-        let index = state.offset + row;
+        let index = offset + row;
         let Some(&book_index) = state.visible.get(index) else {
             break;
         };
@@ -62,7 +62,7 @@ pub fn draw(frame: &mut Frame, state: &AppState, geo: &Geometry, palette: &Palet
         progress(frame, state, geo, &book.path, selected, y, palette);
         meta(frame, state, geo, &book.path, y + 1, palette);
     }
-    scrollbar(frame, state, geo, palette);
+    scrollbar(frame, state, geo, palette, offset);
 }
 
 fn progress(
@@ -157,7 +157,13 @@ fn meta(
     );
 }
 
-fn scrollbar(frame: &mut Frame, state: &AppState, geo: &Geometry, palette: &Palette) {
+fn scrollbar(
+    frame: &mut Frame,
+    state: &AppState,
+    geo: &Geometry,
+    palette: &Palette,
+    offset: usize,
+) {
     if !geo.has_scrollbar {
         return;
     }
@@ -172,7 +178,7 @@ fn scrollbar(frame: &mut Frame, state: &AppState, geo: &Geometry, palette: &Pale
     let thumb = (track * geo.visible / count).max(1).min(track);
     let span = track.saturating_sub(thumb);
     let last = count.saturating_sub(geo.visible).max(1);
-    let top = geo.list_top as usize + state.offset * span / last;
+    let top = geo.list_top as usize + offset * span / last;
     for step in 0..thumb {
         put(
             frame,

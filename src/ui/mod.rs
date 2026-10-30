@@ -6,7 +6,7 @@ pub mod header;
 pub mod list;
 
 use crate::app::{AppState, FilterState};
-use crate::layout::{geometry, MIN_HEIGHT, MIN_WIDTH};
+use crate::layout::{clamp_offset, geometry, MIN_HEIGHT, MIN_WIDTH};
 use crate::presentation::truncate;
 use crate::theme::Palette;
 use ratatui::layout::Rect;
@@ -25,8 +25,9 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
     }
     let geo = geometry(area.width, area.height, state.visible.len());
     let palette = Palette::new();
+    let offset = clamp_offset(state.offset, state.cursor, geo.visible, state.visible.len());
     header::draw(frame, state, &geo, &palette);
-    list::draw(frame, state, &geo, &palette);
+    list::draw(frame, state, &geo, &palette, offset);
     if matches!(state.filter, FilterState::Editing { .. }) {
         filter::draw(frame, state, &geo, &palette);
     } else {
@@ -38,7 +39,10 @@ pub fn put(frame: &mut Frame, x: u16, y: u16, width: u16, text: &str, style: Sty
     if width == 0 {
         return;
     }
-    let area = Rect::new(x, y, width, 1);
+    let area = Rect::new(x, y, width, 1).intersection(frame.area());
+    if area.is_empty() {
+        return;
+    }
     frame.render_widget(Paragraph::new(text.to_string()).style(style), area);
 }
 

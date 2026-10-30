@@ -214,8 +214,8 @@ fn run_tui(config: Config, home: PathBuf) -> Result<()> {
         for effect in effects {
             match effect {
                 Effect::Scan => {
-                    state.replace_books(library::scan(&books_dir));
                     let rows = rows_visible(terminal.area().height);
+                    state.refresh_books(library::scan(&books_dir), rows);
                     let requests = state.request_metadata(rows);
                     if !requests.is_empty() {
                         let _ = metadata_sender.send(requests);
@@ -245,14 +245,17 @@ fn run_tui(config: Config, home: PathBuf) -> Result<()> {
             DirChange::Vanished => {
                 dir_present = false;
                 state.set_persistent_status(banner.clone());
-                state.replace_books(Vec::new());
+                state.refresh_books(Vec::new(), rows_visible(terminal.area().height));
             }
             DirChange::Returned => {
                 dir_present = true;
                 if is_banner(&state.status, &banner) {
                     state.status = None;
                 }
-                state.replace_books(library::scan(&books_dir));
+                state.refresh_books(
+                    library::scan(&books_dir),
+                    rows_visible(terminal.area().height),
+                );
                 _watcher = None;
                 _watcher = watcher::start(books_dir.clone(), events.clone()).ok();
             }

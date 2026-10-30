@@ -191,3 +191,34 @@ fn metadata_load_updates_the_state() {
     );
     assert_eq!(state.metadata[&path].author, "Author");
 }
+
+fn numbered(count: usize) -> Vec<Book> {
+    (0..count)
+        .map(|n| Book {
+            path: BookPath::new(PathBuf::from(format!("/books/book{n:02}.pdf"))),
+            size: 100,
+        })
+        .collect()
+}
+
+#[test]
+fn replace_books_keeps_the_cursor_on_the_same_path() {
+    let mut state = state(&[]);
+    state.replace_books(numbered(10));
+    state.cursor = 7;
+    let selected = state.selected().unwrap().path.clone();
+    state.replace_books(numbered(10).into_iter().skip(3).collect());
+    assert_eq!(state.selected().unwrap().path, selected);
+    assert_eq!(state.cursor, 4);
+}
+
+#[test]
+fn refresh_books_reclamps_the_scroll_offset() {
+    let mut state = state(&[]);
+    state.replace_books(numbered(30));
+    update(&mut state, key(KeyCode::Char('G')), Rect::new(0, 0, 80, 24));
+    assert_eq!(state.offset, 24);
+    state.refresh_books(numbered(5), 6);
+    assert_eq!(state.offset, 0);
+    assert!(state.cursor < 5);
+}
