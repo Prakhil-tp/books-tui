@@ -10,11 +10,15 @@ use std::process::{ExitStatus, Output};
 #[derive(Default)]
 struct FakeTerminal {
     calls: RefCell<Vec<&'static str>>,
+    fail_suspend: bool,
 }
 
 impl TerminalControl for FakeTerminal {
     fn suspend(&mut self) -> anyhow::Result<()> {
         self.calls.borrow_mut().push("suspend");
+        if self.fail_suspend {
+            anyhow::bail!("suspend failed");
+        }
         Ok(())
     }
     fn resume(&mut self) -> anyhow::Result<()> {
@@ -78,4 +82,24 @@ fn resumes_and_returns_the_error_when_the_reader_fails() {
 
     assert!(open_book(&mut terminal, &runner, &reader, &path).is_err());
     assert_eq!(*terminal.calls.borrow(), vec!["suspend", "resume"]);
+}
+
+#[test]
+fn resumes_and_returns_the_error_when_suspend_fails() {
+    let reader = ReaderCommand::parse("zathura").unwrap();
+    let path = BookPath::new(PathBuf::from("/books/a.pdf"));
+    let mut terminal = FakeTerminal {
+        fail_suspend: true,
+        ..FakeTerminal::default()
+    };
+    let runner = FakeRunner {
+        argv: RefCell::new(Vec::new()),
+        fail: false,
+    };
+
+    let error = open_book(&mut terminal, &runner, &reader, &path).unwrap_err();
+
+    assert!(error.to_string().contains("suspend failed"));
+    assert_eq!(*terminal.calls.borrow(), vec!["suspend", "resume"]);
+    assert!(runner.argv.borrow().is_empty());
 }

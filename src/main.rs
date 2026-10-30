@@ -175,7 +175,17 @@ fn resolve_history_path(home: &Path) -> PathBuf {
     candidate
 }
 
+fn install_panic_hook() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = disable_raw_mode();
+        let _ = execute!(stdout(), LeaveAlternateScreen, Show);
+        previous(info);
+    }));
+}
+
 fn run_tui(config: Config, home: PathBuf) -> Result<()> {
+    install_panic_hook();
     let mut terminal = TerminalSession::new()?;
     let books_dir = config.books_dir.as_path().to_path_buf();
     let history_path = resolve_history_path(&home);
@@ -338,6 +348,9 @@ fn spawn_input(sender: Sender<Event>, suspended: Arc<AtomicBool>) {
             Ok(false) => continue,
             Err(_) => break,
         }
+        if suspended.load(Ordering::SeqCst) {
+            continue;
+        }
         let event = match terminal_event::read() {
             Ok(terminal_event::Event::Key(key)) => Event::Key(key),
             Ok(terminal_event::Event::Resize(width, height)) => Event::Resize(width, height),
@@ -379,14 +392,25 @@ struct TerminalSession {
 impl TerminalSession {
     fn new() -> Result<Self> {
         enable_raw_mode()?;
+        Self::enter().inspect_err(|_| {
+            let _ = disable_raw_mode();
+        })
+    }
+
+    fn enter() -> Result<Self> {
         let mut out = stdout();
         execute!(out, EnterAlternateScreen, Hide)?;
-        let backend = CrosstermBackend::new(out);
-        let terminal = Terminal::new(backend)?;
-        Ok(Self {
-            terminal,
-            suspended: Arc::new(AtomicBool::new(false)),
-        })
+        let built = Terminal::new(CrosstermBackend::new(stdout()));
+        match built {
+            Ok(terminal) => Ok(Self {
+                terminal,
+                suspended: Arc::new(AtomicBool::new(false)),
+            }),
+            Err(error) => {
+                let _ = execute!(out, LeaveAlternateScreen, Show);
+                Err(error.into())
+            }
+        }
     }
 
     fn area(&self) -> Rect {
@@ -405,16 +429,23 @@ impl TerminalSession {
 impl TerminalControl for TerminalSession {
     fn suspend(&mut self) -> Result<()> {
         self.suspended.store(true, Ordering::SeqCst);
-        disable_raw_mode()?;
-        execute!(self.terminal.backend_mut(), LeaveAlternateScreen, Show)?;
-        Ok(())
+        let result = (|| -> Result<()> {
+            disable_raw_mode()?;
+            execute!(self.terminal.backend_mut(), LeaveAlternateScreen, Show)?;
+            Ok(())
+        })();
+        if result.is_err() {
+            self.suspended.store(false, Ordering::SeqCst);
+        }
+        result
     }
 
     fn resume(&mut self) -> Result<()> {
+        // Input must never stay frozen, whatever happens below.
+        self.suspended.store(false, Ordering::SeqCst);
         execute!(self.terminal.backend_mut(), EnterAlternateScreen, Hide)?;
         enable_raw_mode()?;
         self.terminal.clear()?;
-        self.suspended.store(false, Ordering::SeqCst);
         Ok(())
     }
 }

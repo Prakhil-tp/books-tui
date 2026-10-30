@@ -25,7 +25,11 @@ pub fn open_book(
 ) -> Result<()> {
     let argv = reader_argv(reader, path);
     let argv_refs: Vec<&str> = argv.iter().map(String::as_str).collect();
-    terminal.suspend()?;
+    if let Err(error) = terminal.suspend() {
+        // A half-suspended terminal must still be restored.
+        let _ = terminal.resume();
+        return Err(error);
+    }
     let result = runner.run_interactive(&argv_refs);
     let resumed = terminal.resume();
     result?;
