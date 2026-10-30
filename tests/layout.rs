@@ -3,15 +3,15 @@ use books_tui::layout::{clamp_offset, geometry, rows_visible};
 #[test]
 fn header_leaves_room_for_books() {
     let geo = geometry(90, 26, 3);
-    assert_eq!(geo.list_top, 4);
-    assert_eq!(geo.visible, 7);
+    assert_eq!(geo.list_top, 5);
+    assert_eq!(geo.visible, 6);
     assert_eq!(geo.footer_y, 25);
 }
 
 #[test]
 fn small_terminal_still_shows_a_book() {
     let geo = geometry(60, 8, 3);
-    assert_eq!(geo.list_top, 4);
+    assert_eq!(geo.list_top, 5);
     assert_eq!(geo.visible, 1);
     assert_eq!(rows_visible(8), 1);
 }

@@ -1,7 +1,7 @@
 //! Screen geometry and scroll math.
 
 pub const ROW_HEIGHT: u16 = 3;
-pub const HEADER_HEIGHT: u16 = 4;
+pub const HEADER_HEIGHT: u16 = 5;
 pub const MIN_WIDTH: u16 = 34;
 pub const MIN_HEIGHT: u16 = 8;
 
@@ -33,7 +33,7 @@ pub fn geometry(width: u16, height: u16, count: usize) -> Geometry {
         content_right: if has_scrollbar {
             width.saturating_sub(4)
         } else {
-            width.saturating_sub(1)
+            width.saturating_sub(3)
         },
         has_scrollbar,
         footer_y: height.saturating_sub(1),

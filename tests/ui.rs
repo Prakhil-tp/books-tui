@@ -42,7 +42,8 @@ fn render(state: &AppState, width: u16, height: u16) -> String {
 fn draws_wordmark_summary_and_footer() {
     let state = state(&["a", "b", "c"]);
     let text = render(&state, 90, 26);
-    assert!(text.contains("██▄"));
+    assert!(text.contains("┏┓ ┏━┓┏━┓╻┏ ┏━┓"));
+    assert!(text.contains("┗━┛┗━┛┗━┛╹ ╹┗━┛"));
     assert!(text.contains("3 volumes"));
     assert!(text.contains("3.0K"));
     assert!(text.contains("j/k"));
@@ -118,7 +119,8 @@ fn renders_a_scrollbar_for_long_lists() {
     state.offset = 35;
     let geo = books_tui::layout::geometry(90, 20, 40);
     let text = render(&state, 90, 20);
-    let cells = column(&text, geo.scroll_x as usize, 4..19);
+    let top = geo.list_top as usize;
+    let cells = column(&text, geo.scroll_x as usize, top..19);
     assert!(cells.contains(&'█'));
     assert!(cells.contains(&'│'));
 }
@@ -128,10 +130,11 @@ fn short_lists_leave_the_scrollbar_column_blank() {
     let state = state(&["a", "b"]);
     let geo = books_tui::layout::geometry(90, 20, 2);
     let text = render(&state, 90, 20);
-    // Rows 4 and 7 hold the right-aligned "unread" labels; skip them.
+    // The first line of each row holds the right-aligned "unread" label; skip it.
     let x = geo.scroll_x as usize;
-    let mut cells = column(&text, x, 5..7);
-    cells.extend(column(&text, x, 8..19));
+    let top = geo.list_top as usize;
+    let mut cells = column(&text, x, top + 1..top + 3);
+    cells.extend(column(&text, x, top + 4..19));
     assert!(cells.iter().all(|c| *c == ' '));
 }
 
@@ -139,7 +142,7 @@ fn short_lists_leave_the_scrollbar_column_blank() {
 fn summary_is_right_aligned_by_display_width() {
     let state = state(&["a", "b", "c"]);
     let text = render(&state, 90, 26);
-    let line = text.lines().nth(2).unwrap();
+    let line = text.lines().nth(1).unwrap();
     assert_eq!(line.chars().count(), 90);
     assert!(line.ends_with("3 volumes · 3.0K  "));
 }
@@ -227,4 +230,13 @@ fn drawing_larger_than_the_last_update_does_not_panic() {
     state.offset = 24;
     let text = render(&state, 80, 40);
     assert!(text.to_lowercase().contains("book29"));
+}
+
+#[test]
+fn row_labels_keep_the_same_right_margin_as_the_summary() {
+    let state = state(&["a", "b", "c"]);
+    let text = render(&state, 90, 26);
+    let top = books_tui::layout::geometry(90, 26, 3).list_top as usize;
+    let row = text.lines().nth(top).unwrap();
+    assert!(row.ends_with("unread  "), "row was {row:?}");
 }

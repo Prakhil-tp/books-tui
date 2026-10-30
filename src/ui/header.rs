@@ -7,11 +7,11 @@ use crate::theme::Palette;
 use crate::ui::{put, put_right};
 use ratatui::Frame;
 
-const LOGO: [&str; 2] = [" ██▄ █▀█ █▀█ █░█ ▄▀▀", " █▄█ █▄█ █▄█ █▀▄ ▄██"];
+const LOGO: [&str; 3] = [" ┏┓ ┏━┓┏━┓╻┏ ┏━┓", " ┣┻┓┃ ┃┃ ┃┣┻┓┗━┓", " ┗━┛┗━┛┗━┛╹ ╹┗━┛"];
 
 pub fn draw(frame: &mut Frame, state: &AppState, geo: &Geometry, palette: &Palette) {
     for (offset, line) in LOGO.iter().enumerate() {
-        let style = if offset == 0 {
+        let style = if offset + 1 < LOGO.len() {
             palette.amber
         } else {
             palette.amber_soft
@@ -33,12 +33,12 @@ pub fn draw(frame: &mut Frame, state: &AppState, geo: &Geometry, palette: &Palet
     if geo.width as usize
         > 2 + LOGO[0].chars().count() + 4 + unicode_width::UnicodeWidthStr::width(summary.as_str())
     {
-        put_right(frame, geo.width.saturating_sub(2), 2, &summary, palette.dim);
+        put_right(frame, geo.width.saturating_sub(2), 1, &summary, palette.dim);
     }
     put(
         frame,
         0,
-        3,
+        geo.list_top - 1,
         geo.width,
         &"─".repeat(geo.width as usize),
         palette.dim,
