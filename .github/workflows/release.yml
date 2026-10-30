@@ -42,3 +42,13 @@ jobs:
           archive: $bin-$target
           checksum: sha256
           token: ${{ secrets.GITHUB_TOKEN }}
+      - if: contains(matrix.target, 'linux')
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb
+      - if: contains(matrix.target, 'linux')
+        run: |
+          deb=$(cargo deb --no-build --no-strip --target ${{ matrix.target }} | tail -n1)
+          gh release upload "$GITHUB_REF_NAME" "$deb"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,8 +1,16 @@
 [package]
 name = "books-tui"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.88"
+description = "Browse, fuzzy-search, and open your PDF library from the terminal"
+license = "MIT"
+repository = "https://github.com/Prakhil-tp/books-tui"
+homepage = "https://github.com/Prakhil-tp/books-tui"
+readme = "README.md"
+keywords = ["tui", "pdf", "terminal", "ebook", "library"]
+categories = ["command-line-utilities"]
+exclude = ["legacy/", "assets/", ".github/", "tests/"]
 
 [dependencies]
 anyhow = "1"
@@ -26,3 +34,15 @@ wait-timeout = "0.2"
 assert_cmd = "2"
 insta = { version = "1", features = ["yaml"] }
 tempfile = "3"
+
+[package.metadata.deb]
+maintainer = "Prakhil TP <20636485+Prakhil-tp@users.noreply.github.com>"
+copyright = "2026, Prakhil TP"
+section = "utils"
+priority = "optional"
+recommends = "zathura, poppler-utils"
+extended-description = "Browse, fuzzy-search, and open your PDF library from the terminal."
+assets = [
+    ["target/release/books-tui", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/books-tui/README", "644"],
+]
