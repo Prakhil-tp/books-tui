@@ -240,3 +240,23 @@ fn system_runner_runs_commands_successfully() {
     let status = runner.run_interactive(&["sh", "-c", "exit 0"]).unwrap();
     assert!(status.success());
 }
+
+#[test]
+fn path_readiness_checks_only_the_program_token() {
+    let dir = tempfile::tempdir().unwrap();
+    let binary = dir.path().join("fakereader");
+    std::fs::write(&binary, b"").unwrap();
+    let with_args = ReaderCommand::parse(&format!("{} --fork", binary.display())).unwrap();
+    assert!(PathReadiness.locate(&with_args));
+    let missing = ReaderCommand::parse("/nonexistent/reader --fork").unwrap();
+    assert!(!PathReadiness.locate(&missing));
+}
+
+#[test]
+fn installable_package_is_offered_only_for_zathura() {
+    use books_tui::install::installable_package;
+    let zathura = ReaderCommand::parse("zathura --fork").unwrap();
+    assert_eq!(installable_package(&zathura), Some("zathura"));
+    let other = ReaderCommand::parse("evince").unwrap();
+    assert_eq!(installable_package(&other), None);
+}

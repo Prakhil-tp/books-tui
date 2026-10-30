@@ -144,3 +144,13 @@ fn first_run_reprompts_when_creation_is_declined() {
 
     assert_eq!(config.books_dir.as_path(), temp.path().join("books"));
 }
+
+#[test]
+fn reader_command_splits_program_and_arguments_on_whitespace() {
+    let reader = ReaderCommand::parse("  zathura   --fork -x ").unwrap();
+    assert_eq!(reader.program(), "zathura");
+    assert_eq!(reader.args(), vec!["--fork", "-x"]);
+    let bare = ReaderCommand::parse("zathura").unwrap();
+    assert_eq!(bare.program(), "zathura");
+    assert!(bare.args().is_empty());
+}

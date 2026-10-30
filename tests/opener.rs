@@ -103,3 +103,13 @@ fn resumes_and_returns_the_error_when_suspend_fails() {
     assert_eq!(*terminal.calls.borrow(), vec!["suspend", "resume"]);
     assert!(runner.argv.borrow().is_empty());
 }
+
+#[test]
+fn reader_arguments_come_before_the_book_path() {
+    let reader = ReaderCommand::parse("zathura --fork").unwrap();
+    let path = BookPath::new(PathBuf::from("/path/book.pdf"));
+    assert_eq!(
+        reader_argv(&reader, &path),
+        vec!["zathura", "--fork", "/path/book.pdf"]
+    );
+}

@@ -11,10 +11,13 @@ pub trait TerminalControl {
 }
 
 pub fn reader_argv(reader: &ReaderCommand, path: &BookPath) -> Vec<String> {
-    vec![
-        reader.as_str().to_string(),
-        path.as_path().to_string_lossy().into_owned(),
-    ]
+    std::iter::once(reader.program())
+        .chain(reader.args())
+        .map(str::to_string)
+        .chain(std::iter::once(
+            path.as_path().to_string_lossy().into_owned(),
+        ))
+        .collect()
 }
 
 pub fn open_book(

@@ -2,12 +2,12 @@ use anyhow::{bail, Context, Result};
 use books_tui::app::{update, AppState, Effect, Event, Status};
 use books_tui::config::{BooksDir, Config, FileConfigStore, FirstRun, ReaderCommand, StdinPrompt};
 use books_tui::history;
-use books_tui::install::{PathReadiness, ReaderInstaller, SystemRunner};
+use books_tui::install::{installable_package, PathReadiness, ReaderInstaller, SystemRunner};
 use books_tui::layout::rows_visible;
 use books_tui::library::{self, BookPath};
 use books_tui::metadata::{JsonStore, MetadataCache, PdfInfoReader};
 use books_tui::opener::{open_book, TerminalControl};
-use books_tui::ports::ConfigStore;
+use books_tui::ports::{ConfigStore, Readiness};
 use books_tui::ui;
 use books_tui::watcher;
 use clap::Parser;
@@ -135,6 +135,12 @@ fn path_available(binary: &str) -> bool {
 }
 
 fn ensure_reader(config: &Config) -> Result<()> {
+    let Some(package) = installable_package(&config.reader) else {
+        if !PathReadiness.locate(&config.reader) {
+            eprintln!("Reader {} not found on PATH", config.reader.program());
+        }
+        return Ok(());
+    };
     let runner = SystemRunner::default();
     let prompt = StdinPrompt::new();
     let available = |binary: &str| path_available(binary);
@@ -145,7 +151,7 @@ fn ensure_reader(config: &Config) -> Result<()> {
         runner: &runner,
         available: &available,
         reader: &config.reader,
-        package: "zathura",
+        package,
         out: &mut out,
     }
     .ensure()?;

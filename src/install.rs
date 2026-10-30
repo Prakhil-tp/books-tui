@@ -74,6 +74,11 @@ pub fn detect(available: &dyn Fn(&str) -> bool) -> Option<&'static PackageManage
     MANAGERS.iter().find(|manager| available(manager.binary))
 }
 
+/// The package to offer for `reader`; only zathura has a known package.
+pub fn installable_package(reader: &ReaderCommand) -> Option<&'static str> {
+    (reader.program() == "zathura").then_some("zathura")
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InstallOutcome {
     Present,
@@ -101,7 +106,7 @@ impl ReaderInstaller<'_> {
         writeln!(
             self.out,
             "Reader \"{}\" was not found.",
-            self.reader.as_str()
+            self.reader.program()
         )?;
         let Some(manager) = detect(self.available) else {
             writeln!(
@@ -149,7 +154,7 @@ pub struct PathReadiness;
 
 impl Readiness for PathReadiness {
     fn locate(&self, command: &ReaderCommand) -> bool {
-        let name = command.as_str();
+        let name = command.program();
         if name.contains(std::path::MAIN_SEPARATOR) {
             return Path::new(name).is_file();
         }

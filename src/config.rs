@@ -56,6 +56,16 @@ impl ReaderCommand {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// The executable: the first whitespace-separated token.
+    pub fn program(&self) -> &str {
+        self.0.split_ascii_whitespace().next().unwrap_or_default()
+    }
+
+    /// Extra arguments that precede the book path.
+    pub fn args(&self) -> Vec<&str> {
+        self.0.split_ascii_whitespace().skip(1).collect()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
