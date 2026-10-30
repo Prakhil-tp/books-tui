@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use books_tui::app::{update, AppState, Effect, Event};
+use books_tui::app::{update, AppState, Effect, Event, Status};
 use books_tui::config::{BooksDir, Config, FileConfigStore, FirstRun, ReaderCommand, StdinPrompt};
 use books_tui::history;
 use books_tui::install::{PathReadiness, ReaderInstaller, SystemRunner};
@@ -21,7 +21,9 @@ use ratatui::layout::Rect;
 use ratatui::Terminal;
 use std::io::{stdout, IsTerminal, Stdout};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -185,7 +187,7 @@ fn run_tui(config: Config, home: PathBuf) -> Result<()> {
     }
 
     let (events, receiver) = mpsc::channel();
-    spawn_input(events.clone());
+    spawn_input(events.clone(), terminal.suspended.clone());
     let mut _watcher = watcher::start(books_dir.clone(), events.clone()).ok();
     let (metadata_sender, metadata_receiver) = mpsc::channel();
     let cache = MetadataCache::new(
@@ -200,6 +202,7 @@ fn run_tui(config: Config, home: PathBuf) -> Result<()> {
         let _ = metadata_sender.send(requests);
     }
 
+    let banner = missing_message(&books_dir);
     let mut dir_present = books_dir.is_dir();
     let mut last_dir_check = Instant::now();
 
@@ -226,7 +229,9 @@ fn run_tui(config: Config, home: PathBuf) -> Result<()> {
                 }
                 Effect::Open(path) => {
                     let runner = SystemRunner::default();
-                    match open_book(&mut terminal, &runner, &state.config.reader, &path) {
+                    let opened = open_book(&mut terminal, &runner, &state.config.reader, &path);
+                    discard_stale_keys(&receiver, &events);
+                    match opened {
                         Ok(()) => {
                             state.records = history::load(&history_path);
                         }
@@ -239,15 +244,22 @@ fn run_tui(config: Config, home: PathBuf) -> Result<()> {
         match dir_transition(dir_present, &mut last_dir_check, &books_dir) {
             DirChange::Vanished => {
                 dir_present = false;
-                state.set_persistent_status(missing_message(&books_dir));
+                state.set_persistent_status(banner.clone());
                 state.replace_books(Vec::new());
             }
             DirChange::Returned => {
                 dir_present = true;
-                state.status = None;
+                if is_banner(&state.status, &banner) {
+                    state.status = None;
+                }
                 state.replace_books(library::scan(&books_dir));
                 _watcher = None;
                 _watcher = watcher::start(books_dir.clone(), events.clone()).ok();
+            }
+            DirChange::StillMissing => {
+                if !is_banner(&state.status, &banner) {
+                    state.set_persistent_status(banner.clone());
+                }
             }
             DirChange::Unchanged => {}
         }
@@ -269,6 +281,7 @@ const DIR_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 enum DirChange {
     Unchanged,
     Vanished,
+    StillMissing,
     Returned,
 }
 
@@ -276,9 +289,25 @@ fn missing_message(directory: &Path) -> String {
     format!("{} does not exist", directory.display())
 }
 
+fn is_banner(status: &Option<Status>, banner: &str) -> bool {
+    status.as_ref().is_some_and(|status| status.text == banner)
+}
+
+/// Drops key events queued while the reader had the terminal, keeping the rest.
+fn discard_stale_keys(receiver: &Receiver<Event>, sender: &Sender<Event>) {
+    let kept: Vec<Event> = receiver
+        .try_iter()
+        .filter(|event| !matches!(event, Event::Key(_)))
+        .collect();
+    for event in kept {
+        let _ = sender.send(event);
+    }
+}
+
 fn classify_dir(was_present: bool, is_present: bool) -> DirChange {
     match (was_present, is_present) {
         (true, false) => DirChange::Vanished,
+        (false, false) => DirChange::StillMissing,
         (false, true) => DirChange::Returned,
         _ => DirChange::Unchanged,
     }
@@ -293,21 +322,27 @@ fn dir_transition(was_present: bool, last_check: &mut Instant, directory: &Path)
     classify_dir(was_present, directory.is_dir())
 }
 
-fn spawn_input(sender: Sender<Event>) {
+/// Reads terminal input on its own thread. While `suspended` is set (a reader
+/// owns the terminal) it leaves input alone so keystrokes are not stolen.
+fn spawn_input(sender: Sender<Event>, suspended: Arc<AtomicBool>) {
     thread::spawn(move || loop {
-        match terminal_event::read() {
-            Ok(terminal_event::Event::Key(key)) => {
-                if sender.send(Event::Key(key)).is_err() {
-                    break;
-                }
-            }
-            Ok(terminal_event::Event::Resize(width, height)) => {
-                if sender.send(Event::Resize(width, height)).is_err() {
-                    break;
-                }
-            }
-            Ok(_) => {}
+        if suspended.load(Ordering::SeqCst) {
+            thread::sleep(Duration::from_millis(50));
+            continue;
+        }
+        match terminal_event::poll(Duration::from_millis(50)) {
+            Ok(true) => {}
+            Ok(false) => continue,
             Err(_) => break,
+        }
+        let event = match terminal_event::read() {
+            Ok(terminal_event::Event::Key(key)) => Event::Key(key),
+            Ok(terminal_event::Event::Resize(width, height)) => Event::Resize(width, height),
+            Ok(_) => continue,
+            Err(_) => break,
+        };
+        if sender.send(event).is_err() {
+            break;
         }
     });
 }
@@ -335,6 +370,7 @@ fn spawn_metadata_worker(
 
 struct TerminalSession {
     terminal: Terminal<CrosstermBackend<Stdout>>,
+    suspended: Arc<AtomicBool>,
 }
 
 impl TerminalSession {
@@ -344,7 +380,10 @@ impl TerminalSession {
         execute!(out, EnterAlternateScreen, Hide)?;
         let backend = CrosstermBackend::new(out);
         let terminal = Terminal::new(backend)?;
-        Ok(Self { terminal })
+        Ok(Self {
+            terminal,
+            suspended: Arc::new(AtomicBool::new(false)),
+        })
     }
 
     fn area(&self) -> Rect {
@@ -362,6 +401,7 @@ impl TerminalSession {
 
 impl TerminalControl for TerminalSession {
     fn suspend(&mut self) -> Result<()> {
+        self.suspended.store(true, Ordering::SeqCst);
         disable_raw_mode()?;
         execute!(self.terminal.backend_mut(), LeaveAlternateScreen, Show)?;
         Ok(())
@@ -371,6 +411,7 @@ impl TerminalControl for TerminalSession {
         execute!(self.terminal.backend_mut(), EnterAlternateScreen, Hide)?;
         enable_raw_mode()?;
         self.terminal.clear()?;
+        self.suspended.store(false, Ordering::SeqCst);
         Ok(())
     }
 }
@@ -391,7 +432,41 @@ mod tests {
         assert_eq!(classify_dir(true, false), DirChange::Vanished);
         assert_eq!(classify_dir(false, true), DirChange::Returned);
         assert_eq!(classify_dir(true, true), DirChange::Unchanged);
-        assert_eq!(classify_dir(false, false), DirChange::Unchanged);
+        assert_eq!(classify_dir(false, false), DirChange::StillMissing);
+        assert_eq!(classify_dir(true, true), DirChange::Unchanged);
+    }
+
+    #[test]
+    fn banner_is_recognised_only_by_exact_text() {
+        let status = |text: &str| {
+            Some(Status {
+                text: text.to_string(),
+                ticks_left: None,
+            })
+        };
+        assert!(is_banner(&status("/b does not exist"), "/b does not exist"));
+        assert!(!is_banner(
+            &status("could not open book"),
+            "/b does not exist"
+        ));
+        assert!(!is_banner(&None, "/b does not exist"));
+    }
+
+    #[test]
+    fn stale_keys_are_dropped_and_other_events_kept() {
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+        let (sender, receiver) = mpsc::channel();
+        sender
+            .send(Event::Key(KeyEvent::new(
+                KeyCode::Char('q'),
+                KeyModifiers::NONE,
+            )))
+            .unwrap();
+        sender.send(Event::FilesChanged).unwrap();
+        sender.send(Event::Tick).unwrap();
+        discard_stale_keys(&receiver, &sender);
+        let rest: Vec<Event> = receiver.try_iter().collect();
+        assert_eq!(rest, vec![Event::FilesChanged, Event::Tick]);
     }
 
     #[test]
