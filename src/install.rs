@@ -129,8 +129,8 @@ impl ReaderInstaller<'_> {
         let argv_refs: Vec<&str> = argv.iter().map(String::as_str).collect();
         let success = self
             .runner
-            .run(&argv_refs)
-            .map(|output| output.status.success())
+            .run_interactive(&argv_refs)
+            .map(|status| status.success())
             .unwrap_or(false);
         if success && self.readiness.locate(self.reader) {
             writeln!(self.out, "Installed {}.", self.package)?;
@@ -175,6 +175,9 @@ impl Default for SystemRunner {
 
 impl CommandRunner for SystemRunner {
     fn run(&self, argv: &[&str]) -> Result<Output> {
+        if argv.is_empty() {
+            bail!("command argv must not be empty");
+        }
         let mut child = Command::new(argv[0])
             .args(&argv[1..])
             .stdout(Stdio::piped())
@@ -191,6 +194,9 @@ impl CommandRunner for SystemRunner {
     }
 
     fn run_interactive(&self, argv: &[&str]) -> Result<ExitStatus> {
+        if argv.is_empty() {
+            bail!("command argv must not be empty");
+        }
         Ok(Command::new(argv[0]).args(&argv[1..]).status()?)
     }
 }

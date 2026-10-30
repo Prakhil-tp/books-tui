@@ -46,7 +46,9 @@ impl CommandRunner for FakeRunner {
         })
     }
     fn run_interactive(&self, _argv: &[&str]) -> anyhow::Result<ExitStatus> {
-        Ok(ExitStatus::from_raw(0))
+        self.calls.set(self.calls.get() + 1);
+        let code = if self.succeed { 0 } else { 1 };
+        Ok(ExitStatus::from_raw(code))
     }
 }
 
@@ -221,4 +223,20 @@ fn path_readiness_finds_common_binaries() {
 fn system_runner_reports_missing_binaries() {
     let runner = SystemRunner::default();
     assert!(runner.run(&["definitely-not-a-real-binary-xyz"]).is_err());
+}
+
+#[test]
+fn system_runner_rejects_empty_argv() {
+    let runner = SystemRunner::default();
+    assert!(runner.run(&[]).is_err());
+    assert!(runner.run_interactive(&[]).is_err());
+}
+
+#[test]
+fn system_runner_runs_commands_successfully() {
+    let runner = SystemRunner::default();
+    let output = runner.run(&["sh", "-c", "exit 0"]).unwrap();
+    assert!(output.status.success());
+    let status = runner.run_interactive(&["sh", "-c", "exit 0"]).unwrap();
+    assert!(status.success());
 }
