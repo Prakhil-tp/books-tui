@@ -27,4 +27,4 @@ expression: "render(&state, 90, 26)"
                                                                                           
                                                                                           
                                                                                           
-  j/k move  gg/G ends  ^d/^u half  Enter/l open  q quit
+  j/k move  gg/G ends  ^d/^u half  / filter  Enter/l open  q quit

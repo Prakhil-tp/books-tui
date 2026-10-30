@@ -6,10 +6,11 @@ use crate::theme::Palette;
 use crate::ui::put;
 use ratatui::Frame;
 
-const HINTS: [(&str, &str); 5] = [
+const HINTS: [(&str, &str); 6] = [
     ("j/k", "move"),
     ("gg/G", "ends"),
     ("^d/^u", "half"),
+    ("/", "filter"),
     ("Enter/l", "open"),
     ("q", "quit"),
 ];

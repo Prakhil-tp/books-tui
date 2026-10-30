@@ -101,6 +101,14 @@ fn renders_the_too_small_message() {
     assert!(render(&state, 20, 5).contains("terminal too small"));
 }
 
+fn column(text: &str, x: usize, rows: std::ops::Range<usize>) -> Vec<char> {
+    text.lines()
+        .enumerate()
+        .filter(|(y, _)| rows.contains(y))
+        .map(|(_, line)| line.chars().nth(x).unwrap())
+        .collect()
+}
+
 #[test]
 fn renders_a_scrollbar_for_long_lists() {
     let titles: Vec<String> = (0..40).map(|index| format!("book{index}")).collect();
@@ -108,7 +116,57 @@ fn renders_a_scrollbar_for_long_lists() {
     let mut state = state(&refs);
     state.cursor = 39;
     state.offset = 35;
-    assert!(render(&state, 90, 20).contains("█"));
+    let geo = books_tui::layout::geometry(90, 20, 40);
+    let text = render(&state, 90, 20);
+    let cells = column(&text, geo.scroll_x as usize, 4..19);
+    assert!(cells.contains(&'█'));
+    assert!(cells.contains(&'│'));
+}
+
+#[test]
+fn short_lists_leave_the_scrollbar_column_blank() {
+    let state = state(&["a", "b"]);
+    let geo = books_tui::layout::geometry(90, 20, 2);
+    let text = render(&state, 90, 20);
+    // Rows 4 and 7 hold the right-aligned "unread" labels; skip them.
+    let x = geo.scroll_x as usize;
+    let mut cells = column(&text, x, 5..7);
+    cells.extend(column(&text, x, 8..19));
+    assert!(cells.iter().all(|c| *c == ' '));
+}
+
+#[test]
+fn summary_is_right_aligned_by_display_width() {
+    let state = state(&["a", "b", "c"]);
+    let text = render(&state, 90, 26);
+    let line = text.lines().nth(2).unwrap();
+    assert_eq!(line.chars().count(), 90);
+    assert!(line.ends_with("3 volumes · 3.0K  "));
+}
+
+#[test]
+fn monochrome_palette_keeps_modifiers_without_colors() {
+    use ratatui::style::Modifier;
+    let palette = books_tui::theme::Palette::with_color(false);
+    for style in [
+        palette.amber,
+        palette.amber_soft,
+        palette.dim,
+        palette.faint,
+        palette.text,
+    ] {
+        assert_eq!(style.fg, None);
+        assert_eq!(style.bg, None);
+    }
+    assert!(palette.amber.add_modifier.contains(Modifier::BOLD));
+    assert!(palette.amber_soft.add_modifier.contains(Modifier::BOLD));
+    assert!(palette.dim.add_modifier.contains(Modifier::DIM));
+    assert!(palette.faint.add_modifier.contains(Modifier::DIM));
+    assert_eq!(palette.text, ratatui::style::Style::default());
+    assert!(books_tui::theme::Palette::with_color(true)
+        .amber
+        .fg
+        .is_some());
 }
 
 #[test]

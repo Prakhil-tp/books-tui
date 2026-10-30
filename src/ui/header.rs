@@ -30,7 +30,9 @@ pub fn draw(frame: &mut Frame, state: &AppState, geo: &Geometry, palette: &Palet
             format_size(total)
         ),
     };
-    if geo.width as usize > 2 + LOGO[0].chars().count() + 4 + summary.len() {
+    if geo.width as usize
+        > 2 + LOGO[0].chars().count() + 4 + unicode_width::UnicodeWidthStr::width(summary.as_str())
+    {
         put_right(frame, geo.width.saturating_sub(2), 2, &summary, palette.dim);
     }
     put(
