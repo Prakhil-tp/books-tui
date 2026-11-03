@@ -1,6 +1,6 @@
 [package]
 name = "books-tui"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 rust-version = "1.88"
 description = "Browse, fuzzy-search, and open your PDF library from the terminal"
