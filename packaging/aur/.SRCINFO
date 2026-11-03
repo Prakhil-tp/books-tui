@@ -1,6 +1,6 @@
 pkgbase = books-tui-bin
 	pkgdesc = Browse, fuzzy-search, and open your PDF library from the terminal
-	pkgver = 0.1.1
+	pkgver = 0.1.2
 	pkgrel = 1
 	url = https://github.com/Prakhil-tp/books-tui
 	arch = x86_64
@@ -11,11 +11,11 @@ pkgbase = books-tui-bin
 	provides = books-tui
 	conflicts = books-tui
 	options = !debug
-	source = LICENSE-0.1.1::https://raw.githubusercontent.com/Prakhil-tp/books-tui/v0.1.1/LICENSE
+	source = LICENSE-0.1.2::https://raw.githubusercontent.com/Prakhil-tp/books-tui/v0.1.2/LICENSE
 	sha256sums = 460c3bf8fd078d7020678dd3e310a088a1d97f1e0936aa926b369f0655888982
-	source_x86_64 = books-tui-bin-0.1.1-x86_64.tar.gz::https://github.com/Prakhil-tp/books-tui/releases/download/v0.1.1/books-tui-x86_64-unknown-linux-musl.tar.gz
-	sha256sums_x86_64 = 9220e90be5459d566c2fb9837374fc7fd420fc28efcaa9814849e4493ce06ae9
-	source_aarch64 = books-tui-bin-0.1.1-aarch64.tar.gz::https://github.com/Prakhil-tp/books-tui/releases/download/v0.1.1/books-tui-aarch64-unknown-linux-musl.tar.gz
-	sha256sums_aarch64 = 9c3557281efe20810d2576d34dd3aed6c8683b577d822b978cf7f57cca119b20
+	source_x86_64 = books-tui-bin-0.1.2-x86_64.tar.gz::https://github.com/Prakhil-tp/books-tui/releases/download/v0.1.2/books-tui-x86_64-unknown-linux-musl.tar.gz
+	sha256sums_x86_64 = 98256722c89104ca26201c8db646f0a0bda8f22dcc8070f037d8cf8c33c21c46
+	source_aarch64 = books-tui-bin-0.1.2-aarch64.tar.gz::https://github.com/Prakhil-tp/books-tui/releases/download/v0.1.2/books-tui-aarch64-unknown-linux-musl.tar.gz
+	sha256sums_aarch64 = 3995425435d5e04031b4fb3c89aedde936e3bb5640da8a86bc325e8cb2ba9060
 
 pkgname = books-tui-bin
