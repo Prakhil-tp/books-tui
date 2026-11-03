@@ -5,7 +5,7 @@ Browse and open your PDF library from the terminal.
 ![books-tui screenshot](assets/screenshot.png)
 
 - Fuzzy search across your library
-- Reading progress from zathura history
+- Reading progress from zathura (plain `history` or `database sqlite`)
 - Author, page count, and year via `pdfinfo` (cached)
 - Live refresh when PDFs are added or removed
 - Linux and macOS
@@ -84,3 +84,13 @@ reader = "zathura"
 
 `reader` may include arguments, e.g. `"zathura --fork"`. Set `NO_COLOR` to
 disable colors.
+
+## Reading progress
+
+Progress is read from zathura's `history` file or its `bookmarks.sqlite`
+database (`set database sqlite` in zathurarc), and merged into books-tui's own
+copy at `$XDG_DATA_HOME/books-tui/progress.json` (`~/.local/share` on Linux,
+`~/Library/Application Support` on macOS). zathura's plain `history` can be
+left empty if it is killed while saving (e.g. on shutdown); books-tui's copy
+keeps your progress when that happens. `database sqlite` avoids the problem
+in zathura itself.

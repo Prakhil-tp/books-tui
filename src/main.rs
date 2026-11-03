@@ -168,16 +168,30 @@ fn cache_path(home: &Path) -> PathBuf {
         .join("metadata.json")
 }
 
+fn reading_history(home: &Path) -> history::ReadingHistory {
+    let plain = resolve_history_path(home);
+    let sqlite = plain.with_file_name("bookmarks.sqlite");
+    let own = dirs::data_dir()
+        .unwrap_or_else(|| home.join(".local/share"))
+        .join("books-tui")
+        .join("progress.json");
+    history::ReadingHistory::new(plain, sqlite, own)
+}
+
+fn has_zathura_data(history: &Path) -> bool {
+    history.exists() || history.with_file_name("bookmarks.sqlite").exists()
+}
+
 fn resolve_history_path(home: &Path) -> PathBuf {
     let xdg = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from);
     let candidate = history::history_path(home, xdg.as_deref());
-    if candidate.exists() {
+    if has_zathura_data(&candidate) {
         return candidate;
     }
     #[cfg(target_os = "macos")]
     {
         let mac = home.join("Library/Application Support/zathura/history");
-        if mac.exists() {
+        if has_zathura_data(&mac) {
             return mac;
         }
     }
@@ -197,10 +211,10 @@ fn run_tui(config: Config, home: PathBuf) -> Result<()> {
     install_panic_hook();
     let mut terminal = TerminalSession::new()?;
     let books_dir = config.books_dir.as_path().to_path_buf();
-    let history_path = resolve_history_path(&home);
+    let history = reading_history(&home);
     let mut state = AppState::new(config);
     state.replace_books(library::scan(&books_dir));
-    state.records = history::load(&history_path);
+    state.records = history.load();
     if !books_dir.is_dir() {
         state.set_persistent_status(missing_message(&books_dir));
     }
@@ -241,7 +255,7 @@ fn run_tui(config: Config, home: PathBuf) -> Result<()> {
                     }
                 }
                 Effect::LoadHistory => {
-                    state.records = history::load(&history_path);
+                    state.records = history.load();
                 }
                 Effect::LoadMetadata(paths) => {
                     let _ = metadata_sender.send(paths);
@@ -252,7 +266,7 @@ fn run_tui(config: Config, home: PathBuf) -> Result<()> {
                     discard_stale_keys(&receiver, &events);
                     match opened {
                         Ok(()) => {
-                            state.records = history::load(&history_path);
+                            state.records = history.load();
                         }
                         Err(error) => state.set_status(format!("could not open book: {error}")),
                     }

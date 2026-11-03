@@ -63,3 +63,113 @@ fn history_path_prefers_xdg_data_home() {
         PathBuf::from("/home/me/.local/share/zathura/history")
     );
 }
+
+// --- zathura sqlite backend -------------------------------------------------
+
+use books_tui::history::{load_sqlite, merge, ProgressStore, ReadingHistory, ReadingRecord};
+use std::collections::HashMap;
+
+const ZATHURA_SCHEMA: &str = "CREATE TABLE IF NOT EXISTS fileinfo (file TEXT PRIMARY KEY,page INTEGER,offset INTEGER,zoom FLOAT,rotation INTEGER,pages_per_row INTEGER,first_page_column TEXT,position_x FLOAT,position_y FLOAT,time TIMESTAMP,page_right_to_left INTEGER,sha256 BLOB);";
+
+fn write_sqlite(path: &Path, rows: &[(&str, u32, &str)]) {
+    let connection = rusqlite::Connection::open(path).unwrap();
+    connection.execute_batch(ZATHURA_SCHEMA).unwrap();
+    for (file, page, time) in rows {
+        connection
+            .execute(
+                "REPLACE INTO fileinfo (file, page, time) VALUES (?1, ?2, ?3)",
+                rusqlite::params![file, page, time],
+            )
+            .unwrap();
+    }
+}
+
+fn rec(page: u32, read_at: i64) -> ReadingRecord {
+    ReadingRecord { page, read_at }
+}
+
+#[test]
+fn reads_zathura_sqlite_fileinfo() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("bookmarks.sqlite");
+    write_sqlite(&path, &[("/books/a.pdf", 42, "2026-11-02 13:54:10")]);
+    let records = load_sqlite(&path);
+    // 2026-11-02 13:54:10 UTC
+    assert_eq!(records[&key("/books/a.pdf")], rec(42, 1793627650));
+}
+
+#[test]
+fn missing_or_foreign_sqlite_yields_an_empty_map() {
+    let dir = tempdir().unwrap();
+    assert!(load_sqlite(&dir.path().join("missing.sqlite")).is_empty());
+    let other = dir.path().join("other.sqlite");
+    rusqlite::Connection::open(&other)
+        .unwrap()
+        .execute_batch("CREATE TABLE t (x INTEGER);")
+        .unwrap();
+    assert!(load_sqlite(&other).is_empty());
+    assert!(!dir.path().join("missing.sqlite").exists());
+}
+
+// --- merging and books-tui's own copy ----------------------------------------
+
+#[test]
+fn merge_keeps_the_most_recent_record_per_book() {
+    let mut into = HashMap::from([(key("a"), rec(10, 200)), (key("b"), rec(5, 100))]);
+    let from = HashMap::from([
+        (key("a"), rec(3, 100)),
+        (key("b"), rec(9, 300)),
+        (key("c"), rec(1, 50)),
+    ]);
+    assert!(merge(&mut into, from));
+    assert_eq!(into[&key("a")], rec(10, 200));
+    assert_eq!(into[&key("b")], rec(9, 300));
+    assert_eq!(into[&key("c")], rec(1, 50));
+    assert!(!merge(&mut into, HashMap::from([(key("a"), rec(10, 200))])));
+}
+
+#[test]
+fn progress_store_round_trips() {
+    let dir = tempdir().unwrap();
+    let store = ProgressStore::new(dir.path().join("nested/progress.json"));
+    assert!(store.load().is_empty());
+    let records = HashMap::from([(key("/books/a.pdf"), rec(7, 123))]);
+    store.save(&records).unwrap();
+    assert_eq!(store.load(), records);
+}
+
+#[test]
+fn progress_survives_zathura_truncating_its_history() {
+    let dir = tempdir().unwrap();
+    let plain = dir.path().join("history");
+    let sqlite = dir.path().join("bookmarks.sqlite");
+    let own = dir.path().join("own/progress.json");
+    std::fs::write(&plain, HISTORY).unwrap();
+
+    let first = ReadingHistory::new(plain.clone(), sqlite.clone(), own.clone()).load();
+    assert_eq!(first[&key("/home/me/books/one.pdf")].page, 19);
+
+    // zathura killed mid-write: history left empty.
+    std::fs::write(&plain, "").unwrap();
+    let second = ReadingHistory::new(plain, sqlite, own).load();
+    assert_eq!(second, first);
+}
+
+#[test]
+fn combines_plain_and_sqlite_sources() {
+    let dir = tempdir().unwrap();
+    let plain = dir.path().join("history");
+    let sqlite = dir.path().join("bookmarks.sqlite");
+    std::fs::write(&plain, "[/books/a.pdf]\npage=2\ntime=100\n").unwrap();
+    // 1970-01-01 00:03:20 UTC == 200
+    write_sqlite(
+        &sqlite,
+        &[
+            ("/books/a.pdf", 8, "1970-01-01 00:03:20"),
+            ("/books/b.pdf", 4, "1970-01-01 00:01:40"),
+        ],
+    );
+    let records = ReadingHistory::new(plain, sqlite, dir.path().join("p.json")).load();
+    assert_eq!(records[&key("/books/a.pdf")], rec(8, 200));
+    assert_eq!(records[&key("/books/b.pdf")], rec(4, 100));
+}
